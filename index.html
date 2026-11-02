@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<!-- saved from url=(0064)file:///C:/Users/ALI/Downloads/Castle%20Battle%20Planner(1).html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body class="editing">
+<title>Castle Battle Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="./1684 Castle Battle Planner_files/css2">
+<style>
+/* Layout: a diamond map like the in-game view. The castle is in the middle, the North turret corner points up, and a single ring of 28 town centre boxes (8 per edge, corners shared) surrounds it. */
+:root {
+  --bg: #E7ECF1;
+  --panel: #F6F8FA;
+  --ink: #16202A;
+  --muted: #566574;
+  --line: #C3CDD7;
+  --box: #FFFFFF;
+  --boxline: #A9B6C3;
+  --castle: #B58A2F;
+  --castle-ink: #1C1606;
+  --castle-dark: #6E5217;
+  --focus: #0B63CE;
+  --warn: #B3261E;
+  --L: #C23B2B;
+  --B: #C77A1E;
+  --G: #2C8A5E;
+  --T: #7451C4;
+  --J: #14808F;
+  --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E151C; --panel: #16202A; --ink: #E5ECF3; --muted: #93A2B1; --line: #2A3846;
+    --box: #1B2733; --boxline: #3B4C5D; --castle: #CBA34A; --castle-ink: #1B1505; --castle-dark: #7A5F24;
+    --focus: #6AA9F5; --warn: #FF8A80;
+    --L: #E4604F; --B: #E39A43; --G: #4DB88A; --T: #9C7BE6; --J: #4CC3D3;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E151C; --panel: #16202A; --ink: #E5ECF3; --muted: #93A2B1; --line: #2A3846;
+  --box: #1B2733; --boxline: #3B4C5D; --castle: #CBA34A; --castle-ink: #1B1505; --castle-dark: #7A5F24;
+  --focus: #6AA9F5; --warn: #FF8A80;
+  --L: #E4604F; --B: #E39A43; --G: #4DB88A; --T: #9C7BE6; --J: #4CC3D3;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.45 var(--font-body);
+  padding-block: 20px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+body.editing { padding-bottom: 320px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.app { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 16px; }
+.top h1 { margin: 0; font: 700 32px/1 var(--font-display); letter-spacing: .05em; text-transform: uppercase; text-wrap: balance; }
+.top p { margin: 4px 0 0; color: var(--muted); max-width: 60ch; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.status { font-size: 12px; color: var(--muted); padding: 4px 10px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); }
+.status[data-s="error"], .status[data-s="ro"] { color: var(--warn); border-color: var(--warn); }
+
+.btn { border: 1px solid var(--boxline); background: var(--panel); border-radius: 6px; padding: 6px 12px; font-weight: 500; }
+.btn:hover { background: var(--box); border-color: var(--muted); }
+.btn.danger { color: var(--warn); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+.banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border: 1px dashed var(--castle); border-radius: 8px; background: color-mix(in srgb, var(--castle) 14%, var(--panel)); }
+.banner span { flex: 1 1 260px; min-width: 0; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr) 340px; } }
+
+.maptools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.seg { display: inline-flex; border: 1px solid var(--boxline); border-radius: 6px; overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; padding: 6px 12px; font-weight: 500; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.search { flex: 1 1 160px; min-width: 0; max-width: 260px; border: 1px solid var(--boxline); border-radius: 6px; background: var(--box); padding: 6px 10px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--boxline); background: var(--panel); border-radius: 99px; padding: 3px 10px 3px 4px; font-size: 12px; font-weight: 500; }
+.chip i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--rc); color: var(--bg); font: 700 11px/1 var(--font-display); font-style: normal; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.role-L { --rc: var(--L); } .role-B { --rc: var(--B); } .role-G { --rc: var(--G); } .role-T { --rc: var(--T); } .role-J { --rc: var(--J); }
+
+.mapwrap { overflow: auto; max-height: min(88vh, 1100px); border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 12px; cursor: grab; }
+.mapwrap.panning { cursor: grabbing; user-select: none; }
+.mapwrap .box { cursor: pointer; }
+.zoom { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.zoom input[type=range] { width: 120px; }
+.zval { font-size: 12px; color: var(--muted); min-width: 3.2em; font-variant-numeric: tabular-nums; }
+.stage { position: relative; width: 1800px; flex: none; aspect-ratio: 1; margin: 0 auto; }
+.grid { position: absolute; left: 50%; top: 50%; width: 70.71%; aspect-ratio: 1; transform: translate(-50%, -50%) rotate(45deg); display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); grid-template-rows: repeat(14, minmax(0, 1fr)); gap: 6px; }
+
+.box { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 2px; border: 1px solid var(--boxline); border-radius: 4px; background: var(--box); text-align: center; font-weight: 600; font-size: 11px; line-height: 1.15; overflow: hidden; }
+.box:hover { border-color: var(--muted); }
+/* Boxes are rotated with the map; each box's content is turned back so text stays upright, inside the diamond. */
+.box .ct { position: absolute; left: 50%; top: 50%; width: 90%; height: 66%; transform: translate(-50%, -50%) rotate(-45deg); display: flex; flex-direction: column; justify-content: center; gap: 2px; pointer-events: none; }
+.box .top { display: flex; justify-content: space-between; align-items: baseline; line-height: 1; }
+.box .ct.e .top { justify-content: center; }
+.box .num { font-size: clamp(9px, calc(var(--cell, 70px) * .11), 15px); font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.box .rl { font: 700 clamp(11px, calc(var(--cell, 70px) * .16), 22px)/1 var(--font-display); color: var(--rc); }
+.box .nm { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; text-align: center; font-size: clamp(10px, calc(var(--cell, 70px) * .145), 22px); line-height: 1.1; }
+.box.f { background: color-mix(in srgb, var(--rc) 26%, var(--box)); border-color: var(--rc); }
+.box.sel { outline: 3px solid var(--focus); outline-offset: 1px; z-index: 2; }
+.box.dup { box-shadow: inset 0 0 0 2px var(--warn); }
+.box.dim { opacity: .25; }
+.box.off { background: transparent; border-style: dashed; }
+.box.off:hover { background: color-mix(in srgb, var(--castle) 18%, transparent); border-color: var(--castle); }
+
+.zone { grid-row: 5 / span 6; grid-column: 5 / span 6; position: relative; display: grid; place-items: center; border: 1px dashed var(--castle); border-radius: 8px; background: color-mix(in srgb, var(--castle) 10%, var(--panel)); }
+.keep { width: 44%; aspect-ratio: 1; display: grid; place-items: center; background: var(--castle); color: var(--castle-ink); border-radius: 8px; }
+.kin { width: 72%; display: flex; flex-direction: column; align-items: center; gap: 4px; transform: rotate(-45deg); text-align: center; }
+.kin svg { width: 62%; }
+.kin b { font: 700 clamp(12px, calc(var(--cell, 70px) * .22), 32px)/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; }
+.tur { position: absolute; padding: 2px 10px; border: 1px solid var(--castle); border-radius: 99px; background: var(--panel); font: 600 clamp(11px, calc(var(--cell, 70px) * .14), 18px)/1.5 var(--font-display); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; transform: rotate(-45deg); }
+.tn { top: 9%; left: 9%; } .te { top: 9%; right: 9%; } .ts { bottom: 9%; right: 9%; } .tw { bottom: 9%; left: 9%; }
+
+.side { display: grid; gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+.card h2 { margin: 0 0 8px; font: 600 15px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; }
+label.l { display: block; margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+.in { width: 100%; border: 1px solid var(--boxline); border-radius: 6px; background: var(--box); padding: 8px 10px; }
+.ed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ed-head h2 { margin: 0; }
+.roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.roles .chip { padding: 5px 12px 5px 5px; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.hint { color: var(--muted); margin: 0; }
+.msg { margin: 8px 0 0; font-size: 12px; color: var(--muted); min-height: 1em; }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.stat { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--box); }
+.stat b { display: block; font: 700 22px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--muted); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.list button { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; border: 1px solid var(--line); background: var(--box); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+.list button:hover { border-color: var(--muted); }
+.list .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.list .m { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.list .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rc); flex: none; }
+.warn { color: var(--warn); font-size: 12px; margin: 8px 0 0; }
+details.card summary { cursor: pointer; font: 600 15px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; }
+details.card[open] summary { margin-bottom: 8px; }
+textarea.in { min-height: 110px; resize: vertical; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.row select { border: 1px solid var(--boxline); border-radius: 6px; background: var(--box); padding: 6px 8px; }
+
+@media (max-width: 959px) {
+  .editor { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; border-radius: 12px 12px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); }
+  .editor.empty { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Castle Battle Planner</h1>
+      <p>The castle is in the middle. The inner ring has 28 town centre boxes, 8 along each edge, and the 3 outer rings are for joiners. Box 1 is the North corner. Click a box to put a player's name in it.</p>
+    </div>
+    <div class="toolbar">
+      <span class="status" id="status" data-s="local">Saved in this browser only</span>
+      <button class="btn" id="copyBtn" type="button">Copy list</button>
+      <button class="btn danger" id="clearBtn" type="button">Clear all names</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner">
+    <span>The names on the map are samples so you can see how it works. Clear them and start your own.</span>
+    <button class="btn" id="sampleClear" type="button">Clear sample names</button>
+    <button class="btn" id="sampleKeep" type="button">Dismiss</button>
+  </div>
+
+  <div class="layout">
+    <section class="mapcol" aria-label="Castle map">
+      <div class="maptools">
+        <div class="seg" role="group" aria-label="Mode">
+          <button type="button" id="modeAssign" aria-pressed="true">Assign names</button>
+          <button type="button" id="modeLayout" aria-pressed="false">Edit layout</button>
+        </div>
+        <input class="search" id="search" type="search" placeholder="Find a player" aria-label="Find a player">
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button class="btn" id="zOut" type="button" aria-label="Zoom out">-</button>
+          <input id="zoom" type="range" min="30" max="200" step="5" value="75" aria-label="Zoom">
+          <button class="btn" id="zIn" type="button" aria-label="Zoom in">+</button>
+          <span class="zval" id="zVal">75%</span>
+          <button class="btn" id="zFit" type="button">Fit</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"><button class="chip role-L" type="button" data-role="L" aria-pressed="false"><i>L</i>Rally Leader</button><button class="chip role-B" type="button" data-role="B" aria-pressed="false"><i>B</i>Backup Leader</button><button class="chip role-G" type="button" data-role="G" aria-pressed="false"><i>G</i>Garrison</button><button class="chip role-T" type="button" data-role="T" aria-pressed="false"><i>T</i>Turret</button><button class="chip role-J" type="button" data-role="J" aria-pressed="false"><i>J</i>Joiner</button></div>
+      <div class="mapwrap"><div class="stage" style="width: 1575px; --cell: 73.97732142857141px;"><div class="grid" id="grid"><div class="zone" role="img" aria-label="King's Castle with four turrets"><span class="tur tn">Turret N</span><span class="tur te">Turret E</span><span class="tur ts">Turret S</span><span class="tur tw">Turret W</span><div class="keep"><div class="kin"><svg viewBox="0 0 120 98" aria-hidden="true" fill="currentColor"><rect x="6" y="44" width="108" height="54"></rect><rect x="6" y="24" width="28" height="74"></rect><rect x="6" y="16" width="6" height="8"></rect><rect x="17" y="16" width="6" height="8"></rect><rect x="28" y="16" width="6" height="8"></rect><rect x="42" y="10" width="36" height="88"></rect><rect x="42" y="2" width="6" height="8"></rect><rect x="57" y="2" width="6" height="8"></rect><rect x="72" y="2" width="6" height="8"></rect><rect x="86" y="24" width="28" height="74"></rect><rect x="86" y="16" width="6" height="8"></rect><rect x="97" y="16" width="6" height="8"></rect><rect x="108" y="16" width="6" height="8"></rect><path d="M52 98V74a8 8 0 0 1 16 0V98z" fill="var(--castle-dark)"></path></svg><b>King’s Castle</b></div></div></div><button class="box" type="button" data-k="0-0" style="grid-row:1;grid-column:1" aria-label="Box 109, empty"><span class="ct e"><span class="top"><span class="num">109</span></span></span></button><button class="box" type="button" data-k="0-1" style="grid-row:1;grid-column:2" aria-label="Box 110, empty"><span class="ct e"><span class="top"><span class="num">110</span></span></span></button><button class="box" type="button" data-k="0-2" style="grid-row:1;grid-column:3" aria-label="Box 111, empty"><span class="ct e"><span class="top"><span class="num">111</span></span></span></button><button class="box" type="button" data-k="0-3" style="grid-row:1;grid-column:4" aria-label="Box 112, empty"><span class="ct e"><span class="top"><span class="num">112</span></span></span></button><button class="box" type="button" data-k="0-4" style="grid-row:1;grid-column:5" aria-label="Box 113, empty"><span class="ct e"><span class="top"><span class="num">113</span></span></span></button><button class="box" type="button" data-k="0-5" style="grid-row:1;grid-column:6" aria-label="Box 114, empty"><span class="ct e"><span class="top"><span class="num">114</span></span></span></button><button class="box" type="button" data-k="0-6" style="grid-row:1;grid-column:7" aria-label="Box 115, empty"><span class="ct e"><span class="top"><span class="num">115</span></span></span></button><button class="box" type="button" data-k="0-7" style="grid-row:1;grid-column:8" aria-label="Box 116, empty"><span class="ct e"><span class="top"><span class="num">116</span></span></span></button><button class="box" type="button" data-k="0-8" style="grid-row:1;grid-column:9" aria-label="Box 117, empty"><span class="ct e"><span class="top"><span class="num">117</span></span></span></button><button class="box" type="button" data-k="0-9" style="grid-row:1;grid-column:10" aria-label="Box 118, empty"><span class="ct e"><span class="top"><span class="num">118</span></span></span></button><button class="box" type="button" data-k="0-10" style="grid-row:1;grid-column:11" aria-label="Box 119, empty"><span class="ct e"><span class="top"><span class="num">119</span></span></span></button><button class="box" type="button" data-k="0-11" style="grid-row:1;grid-column:12" aria-label="Box 120, empty"><span class="ct e"><span class="top"><span class="num">120</span></span></span></button><button class="box" type="button" data-k="0-12" style="grid-row:1;grid-column:13" aria-label="Box 121, empty"><span class="ct e"><span class="top"><span class="num">121</span></span></span></button><button class="box" type="button" data-k="0-13" style="grid-row:1;grid-column:14" aria-label="Box 122, empty"><span class="ct e"><span class="top"><span class="num">122</span></span></span></button><button class="box" type="button" data-k="1-0" style="grid-row:2;grid-column:1" aria-label="Box 160, empty"><span class="ct e"><span class="top"><span class="num">160</span></span></span></button><button class="box" type="button" data-k="1-1" style="grid-row:2;grid-column:2" aria-label="Box 65, empty"><span class="ct e"><span class="top"><span class="num">65</span></span></span></button><button class="box" type="button" data-k="1-2" style="grid-row:2;grid-column:3" aria-label="Box 66, empty"><span class="ct e"><span class="top"><span class="num">66</span></span></span></button><button class="box" type="button" data-k="1-3" style="grid-row:2;grid-column:4" aria-label="Box 67, empty"><span class="ct e"><span class="top"><span class="num">67</span></span></span></button><button class="box" type="button" data-k="1-4" style="grid-row:2;grid-column:5" aria-label="Box 68, empty"><span class="ct e"><span class="top"><span class="num">68</span></span></span></button><button class="box" type="button" data-k="1-5" style="grid-row:2;grid-column:6" aria-label="Box 69, empty"><span class="ct e"><span class="top"><span class="num">69</span></span></span></button><button class="box" type="button" data-k="1-6" style="grid-row:2;grid-column:7" aria-label="Box 70, empty"><span class="ct e"><span class="top"><span class="num">70</span></span></span></button><button class="box" type="button" data-k="1-7" style="grid-row:2;grid-column:8" aria-label="Box 71, empty"><span class="ct e"><span class="top"><span class="num">71</span></span></span></button><button class="box" type="button" data-k="1-8" style="grid-row:2;grid-column:9" aria-label="Box 72, empty"><span class="ct e"><span class="top"><span class="num">72</span></span></span></button><button class="box" type="button" data-k="1-9" style="grid-row:2;grid-column:10" aria-label="Box 73, empty"><span class="ct e"><span class="top"><span class="num">73</span></span></span></button><button class="box" type="button" data-k="1-10" style="grid-row:2;grid-column:11" aria-label="Box 74, empty"><span class="ct e"><span class="top"><span class="num">74</span></span></span></button><button class="box" type="button" data-k="1-11" style="grid-row:2;grid-column:12" aria-label="Box 75, empty"><span class="ct e"><span class="top"><span class="num">75</span></span></span></button><button class="box" type="button" data-k="1-12" style="grid-row:2;grid-column:13" aria-label="Box 76, empty"><span class="ct e"><span class="top"><span class="num">76</span></span></span></button><button class="box" type="button" data-k="1-13" style="grid-row:2;grid-column:14" aria-label="Box 123, empty"><span class="ct e"><span class="top"><span class="num">123</span></span></span></button><button class="box" type="button" data-k="2-0" style="grid-row:3;grid-column:1" aria-label="Box 159, empty"><span class="ct e"><span class="top"><span class="num">159</span></span></span></button><button class="box" type="button" data-k="2-1" style="grid-row:3;grid-column:2" aria-label="Box 108, empty"><span class="ct e"><span class="top"><span class="num">108</span></span></span></button><button class="box" type="button" data-k="2-2" style="grid-row:3;grid-column:3" aria-label="Box 29, empty"><span class="ct e"><span class="top"><span class="num">29</span></span></span></button><button class="box f role-J" type="button" data-k="2-3" style="grid-row:3;grid-column:4" aria-label="Box 30, Joiner A, Joiner" title="Joiner A"><span class="ct"><span class="top"><span class="num">30</span><span class="rl">J</span></span><span class="nm">Joiner A</span></span></button><button class="box" type="button" data-k="2-4" style="grid-row:3;grid-column:5" aria-label="Box 31, empty"><span class="ct e"><span class="top"><span class="num">31</span></span></span></button><button class="box f role-J" type="button" data-k="2-5" style="grid-row:3;grid-column:6" aria-label="Box 32, Joiner B, Joiner" title="Joiner B"><span class="ct"><span class="top"><span class="num">32</span><span class="rl">J</span></span><span class="nm">Joiner B</span></span></button><button class="box" type="button" data-k="2-6" style="grid-row:3;grid-column:7" aria-label="Box 33, empty"><span class="ct e"><span class="top"><span class="num">33</span></span></span></button><button class="box" type="button" data-k="2-7" style="grid-row:3;grid-column:8" aria-label="Box 34, empty"><span class="ct e"><span class="top"><span class="num">34</span></span></span></button><button class="box f role-J" type="button" data-k="2-8" style="grid-row:3;grid-column:9" aria-label="Box 35, A Very Long Joiner Name, Joiner" title="A Very Long Joiner Name"><span class="ct"><span class="top"><span class="num">35</span><span class="rl">J</span></span><span class="nm">A Very Long Joiner Name</span></span></button><button class="box" type="button" data-k="2-9" style="grid-row:3;grid-column:10" aria-label="Box 36, empty"><span class="ct e"><span class="top"><span class="num">36</span></span></span></button><button class="box" type="button" data-k="2-10" style="grid-row:3;grid-column:11" aria-label="Box 37, empty"><span class="ct e"><span class="top"><span class="num">37</span></span></span></button><button class="box" type="button" data-k="2-11" style="grid-row:3;grid-column:12" aria-label="Box 38, empty"><span class="ct e"><span class="top"><span class="num">38</span></span></span></button><button class="box" type="button" data-k="2-12" style="grid-row:3;grid-column:13" aria-label="Box 77, empty"><span class="ct e"><span class="top"><span class="num">77</span></span></span></button><button class="box" type="button" data-k="2-13" style="grid-row:3;grid-column:14" aria-label="Box 124, empty"><span class="ct e"><span class="top"><span class="num">124</span></span></span></button><button class="box" type="button" data-k="3-0" style="grid-row:4;grid-column:1" aria-label="Box 158, empty"><span class="ct e"><span class="top"><span class="num">158</span></span></span></button><button class="box" type="button" data-k="3-1" style="grid-row:4;grid-column:2" aria-label="Box 107, empty"><span class="ct e"><span class="top"><span class="num">107</span></span></span></button><button class="box" type="button" data-k="3-2" style="grid-row:4;grid-column:3" aria-label="Box 64, empty"><span class="ct e"><span class="top"><span class="num">64</span></span></span></button><button class="box f role-L" type="button" data-k="3-3" style="grid-row:4;grid-column:4" aria-label="Box 1, Tydog, Rally Leader" title="Tydog"><span class="ct"><span class="top"><span class="num">1</span><span class="rl">L</span></span><span class="nm">Tydog</span></span></button><button class="box f role-L" type="button" data-k="3-4" style="grid-row:4;grid-column:5" aria-label="Box 2, King Solomon, Rally Leader" title="King Solomon"><span class="ct"><span class="top"><span class="num">2</span><span class="rl">L</span></span><span class="nm">King Solomon</span></span></button><button class="box f role-L" type="button" data-k="3-5" style="grid-row:4;grid-column:6" aria-label="Box 3, Biggov, Rally Leader" title="Biggov"><span class="ct"><span class="top"><span class="num">3</span><span class="rl">L</span></span><span class="nm">Biggov</span></span></button><button class="box f role-L" type="button" data-k="3-6" style="grid-row:4;grid-column:7" aria-label="Box 4, Chopper, Rally Leader" title="Chopper"><span class="ct"><span class="top"><span class="num">4</span><span class="rl">L</span></span><span class="nm">Chopper</span></span></button><button class="box f role-L" type="button" data-k="3-7" style="grid-row:4;grid-column:8" aria-label="Box 5, Wood, Rally Leader" title="Wood"><span class="ct"><span class="top"><span class="num">5</span><span class="rl">L</span></span><span class="nm">Wood</span></span></button><button class="box f role-L" type="button" data-k="3-8" style="grid-row:4;grid-column:9" aria-label="Box 6, Frank, Rally Leader" title="Frank"><span class="ct"><span class="top"><span class="num">6</span><span class="rl">L</span></span><span class="nm">Frank</span></span></button><button class="box f role-L" type="button" data-k="3-9" style="grid-row:4;grid-column:10" aria-label="Box 7, DMT, Rally Leader" title="DMT"><span class="ct"><span class="top"><span class="num">7</span><span class="rl">L</span></span><span class="nm">DMT</span></span></button><button class="box f role-L sel" type="button" data-k="3-10" style="grid-row:4;grid-column:11" aria-label="Box 8, OMG, Rally Leader" title="OMG"><span class="ct"><span class="top"><span class="num">8</span><span class="rl">L</span></span><span class="nm">OMG</span></span></button><button class="box" type="button" data-k="3-11" style="grid-row:4;grid-column:12" aria-label="Box 39, empty"><span class="ct e"><span class="top"><span class="num">39</span></span></span></button><button class="box" type="button" data-k="3-12" style="grid-row:4;grid-column:13" aria-label="Box 78, empty"><span class="ct e"><span class="top"><span class="num">78</span></span></span></button><button class="box" type="button" data-k="3-13" style="grid-row:4;grid-column:14" aria-label="Box 125, empty"><span class="ct e"><span class="top"><span class="num">125</span></span></span></button><button class="box" type="button" data-k="4-0" style="grid-row:5;grid-column:1" aria-label="Box 157, empty"><span class="ct e"><span class="top"><span class="num">157</span></span></span></button><button class="box" type="button" data-k="4-1" style="grid-row:5;grid-column:2" aria-label="Box 106, empty"><span class="ct e"><span class="top"><span class="num">106</span></span></span></button><button class="box" type="button" data-k="4-2" style="grid-row:5;grid-column:3" aria-label="Box 63, empty"><span class="ct e"><span class="top"><span class="num">63</span></span></span></button><button class="box" type="button" data-k="4-3" style="grid-row:5;grid-column:4" aria-label="Box 28, empty"><span class="ct e"><span class="top"><span class="num">28</span></span></span></button><button class="box f role-L dup" type="button" data-k="4-10" style="grid-row:5;grid-column:11" aria-label="Box 9, PBK, Rally Leader" title="PBK"><span class="ct"><span class="top"><span class="num">9</span><span class="rl">L</span></span><span class="nm">PBK</span></span></button><button class="box" type="button" data-k="4-11" style="grid-row:5;grid-column:12" aria-label="Box 40, empty"><span class="ct e"><span class="top"><span class="num">40</span></span></span></button><button class="box" type="button" data-k="4-12" style="grid-row:5;grid-column:13" aria-label="Box 79, empty"><span class="ct e"><span class="top"><span class="num">79</span></span></span></button><button class="box" type="button" data-k="4-13" style="grid-row:5;grid-column:14" aria-label="Box 126, empty"><span class="ct e"><span class="top"><span class="num">126</span></span></span></button><button class="box" type="button" data-k="5-0" style="grid-row:6;grid-column:1" aria-label="Box 156, empty"><span class="ct e"><span class="top"><span class="num">156</span></span></span></button><button class="box" type="button" data-k="5-1" style="grid-row:6;grid-column:2" aria-label="Box 105, empty"><span class="ct e"><span class="top"><span class="num">105</span></span></span></button><button class="box" type="button" data-k="5-2" style="grid-row:6;grid-column:3" aria-label="Box 62, empty"><span class="ct e"><span class="top"><span class="num">62</span></span></span></button><button class="box" type="button" data-k="5-3" style="grid-row:6;grid-column:4" aria-label="Box 27, empty"><span class="ct e"><span class="top"><span class="num">27</span></span></span></button><button class="box f role-L dup" type="button" data-k="5-10" style="grid-row:6;grid-column:11" aria-label="Box 10, PBK, Rally Leader" title="PBK"><span class="ct"><span class="top"><span class="num">10</span><span class="rl">L</span></span><span class="nm">PBK</span></span></button><button class="box f role-J" type="button" data-k="5-11" style="grid-row:6;grid-column:12" aria-label="Box 41, Joiner C, Joiner" title="Joiner C"><span class="ct"><span class="top"><span class="num">41</span><span class="rl">J</span></span><span class="nm">Joiner C</span></span></button><button class="box" type="button" data-k="5-12" style="grid-row:6;grid-column:13" aria-label="Box 80, empty"><span class="ct e"><span class="top"><span class="num">80</span></span></span></button><button class="box" type="button" data-k="5-13" style="grid-row:6;grid-column:14" aria-label="Box 127, empty"><span class="ct e"><span class="top"><span class="num">127</span></span></span></button><button class="box" type="button" data-k="6-0" style="grid-row:7;grid-column:1" aria-label="Box 155, empty"><span class="ct e"><span class="top"><span class="num">155</span></span></span></button><button class="box" type="button" data-k="6-1" style="grid-row:7;grid-column:2" aria-label="Box 104, empty"><span class="ct e"><span class="top"><span class="num">104</span></span></span></button><button class="box" type="button" data-k="6-2" style="grid-row:7;grid-column:3" aria-label="Box 61, empty"><span class="ct e"><span class="top"><span class="num">61</span></span></span></button><button class="box" type="button" data-k="6-3" style="grid-row:7;grid-column:4" aria-label="Box 26, empty"><span class="ct e"><span class="top"><span class="num">26</span></span></span></button><button class="box f role-L dup" type="button" data-k="6-10" style="grid-row:7;grid-column:11" aria-label="Box 11, PBK, Rally Leader" title="PBK"><span class="ct"><span class="top"><span class="num">11</span><span class="rl">L</span></span><span class="nm">PBK</span></span></button><button class="box" type="button" data-k="6-11" style="grid-row:7;grid-column:12" aria-label="Box 42, empty"><span class="ct e"><span class="top"><span class="num">42</span></span></span></button><button class="box" type="button" data-k="6-12" style="grid-row:7;grid-column:13" aria-label="Box 81, empty"><span class="ct e"><span class="top"><span class="num">81</span></span></span></button><button class="box" type="button" data-k="6-13" style="grid-row:7;grid-column:14" aria-label="Box 128, empty"><span class="ct e"><span class="top"><span class="num">128</span></span></span></button><button class="box" type="button" data-k="7-0" style="grid-row:8;grid-column:1" aria-label="Box 154, empty"><span class="ct e"><span class="top"><span class="num">154</span></span></span></button><button class="box" type="button" data-k="7-1" style="grid-row:8;grid-column:2" aria-label="Box 103, empty"><span class="ct e"><span class="top"><span class="num">103</span></span></span></button><button class="box" type="button" data-k="7-2" style="grid-row:8;grid-column:3" aria-label="Box 60, empty"><span class="ct e"><span class="top"><span class="num">60</span></span></span></button><button class="box" type="button" data-k="7-3" style="grid-row:8;grid-column:4" aria-label="Box 25, empty"><span class="ct e"><span class="top"><span class="num">25</span></span></span></button><button class="box f role-L" type="button" data-k="7-10" style="grid-row:8;grid-column:11" aria-label="Box 12, Ashurey, Rally Leader" title="Ashurey"><span class="ct"><span class="top"><span class="num">12</span><span class="rl">L</span></span><span class="nm">Ashurey</span></span></button><button class="box" type="button" data-k="7-11" style="grid-row:8;grid-column:12" aria-label="Box 43, empty"><span class="ct e"><span class="top"><span class="num">43</span></span></span></button><button class="box" type="button" data-k="7-12" style="grid-row:8;grid-column:13" aria-label="Box 82, empty"><span class="ct e"><span class="top"><span class="num">82</span></span></span></button><button class="box" type="button" data-k="7-13" style="grid-row:8;grid-column:14" aria-label="Box 129, empty"><span class="ct e"><span class="top"><span class="num">129</span></span></span></button><button class="box" type="button" data-k="8-0" style="grid-row:9;grid-column:1" aria-label="Box 153, empty"><span class="ct e"><span class="top"><span class="num">153</span></span></span></button><button class="box" type="button" data-k="8-1" style="grid-row:9;grid-column:2" aria-label="Box 102, empty"><span class="ct e"><span class="top"><span class="num">102</span></span></span></button><button class="box" type="button" data-k="8-2" style="grid-row:9;grid-column:3" aria-label="Box 59, empty"><span class="ct e"><span class="top"><span class="num">59</span></span></span></button><button class="box" type="button" data-k="8-3" style="grid-row:9;grid-column:4" aria-label="Box 24, empty"><span class="ct e"><span class="top"><span class="num">24</span></span></span></button><button class="box f role-L dup" type="button" data-k="8-10" style="grid-row:9;grid-column:11" aria-label="Box 13, PBK, Rally Leader" title="PBK"><span class="ct"><span class="top"><span class="num">13</span><span class="rl">L</span></span><span class="nm">PBK</span></span></button><button class="box" type="button" data-k="8-11" style="grid-row:9;grid-column:12" aria-label="Box 44, empty"><span class="ct e"><span class="top"><span class="num">44</span></span></span></button><button class="box" type="button" data-k="8-12" style="grid-row:9;grid-column:13" aria-label="Box 83, empty"><span class="ct e"><span class="top"><span class="num">83</span></span></span></button><button class="box" type="button" data-k="8-13" style="grid-row:9;grid-column:14" aria-label="Box 130, empty"><span class="ct e"><span class="top"><span class="num">130</span></span></span></button><button class="box" type="button" data-k="9-0" style="grid-row:10;grid-column:1" aria-label="Box 152, empty"><span class="ct e"><span class="top"><span class="num">152</span></span></span></button><button class="box" type="button" data-k="9-1" style="grid-row:10;grid-column:2" aria-label="Box 101, empty"><span class="ct e"><span class="top"><span class="num">101</span></span></span></button><button class="box" type="button" data-k="9-2" style="grid-row:10;grid-column:3" aria-label="Box 58, empty"><span class="ct e"><span class="top"><span class="num">58</span></span></span></button><button class="box" type="button" data-k="9-3" style="grid-row:10;grid-column:4" aria-label="Box 23, empty"><span class="ct e"><span class="top"><span class="num">23</span></span></span></button><button class="box f role-L dup" type="button" data-k="9-10" style="grid-row:10;grid-column:11" aria-label="Box 14, PBK, Rally Leader" title="PBK"><span class="ct"><span class="top"><span class="num">14</span><span class="rl">L</span></span><span class="nm">PBK</span></span></button><button class="box" type="button" data-k="9-11" style="grid-row:10;grid-column:12" aria-label="Box 45, empty"><span class="ct e"><span class="top"><span class="num">45</span></span></span></button><button class="box" type="button" data-k="9-12" style="grid-row:10;grid-column:13" aria-label="Box 84, empty"><span class="ct e"><span class="top"><span class="num">84</span></span></span></button><button class="box" type="button" data-k="9-13" style="grid-row:10;grid-column:14" aria-label="Box 131, empty"><span class="ct e"><span class="top"><span class="num">131</span></span></span></button><button class="box" type="button" data-k="10-0" style="grid-row:11;grid-column:1" aria-label="Box 151, empty"><span class="ct e"><span class="top"><span class="num">151</span></span></span></button><button class="box" type="button" data-k="10-1" style="grid-row:11;grid-column:2" aria-label="Box 100, empty"><span class="ct e"><span class="top"><span class="num">100</span></span></span></button><button class="box" type="button" data-k="10-2" style="grid-row:11;grid-column:3" aria-label="Box 57, empty"><span class="ct e"><span class="top"><span class="num">57</span></span></span></button><button class="box" type="button" data-k="10-3" style="grid-row:11;grid-column:4" aria-label="Box 22, empty"><span class="ct e"><span class="top"><span class="num">22</span></span></span></button><button class="box" type="button" data-k="10-4" style="grid-row:11;grid-column:5" aria-label="Box 21, empty"><span class="ct e"><span class="top"><span class="num">21</span></span></span></button><button class="box f role-T" type="button" data-k="10-5" style="grid-row:11;grid-column:6" aria-label="Box 20, Turret A, Turret" title="Turret A"><span class="ct"><span class="top"><span class="num">20</span><span class="rl">T</span></span><span class="nm">Turret A</span></span></button><button class="box" type="button" data-k="10-6" style="grid-row:11;grid-column:7" aria-label="Box 19, empty"><span class="ct e"><span class="top"><span class="num">19</span></span></span></button><button class="box" type="button" data-k="10-7" style="grid-row:11;grid-column:8" aria-label="Box 18, empty"><span class="ct e"><span class="top"><span class="num">18</span></span></span></button><button class="box" type="button" data-k="10-8" style="grid-row:11;grid-column:9" aria-label="Box 17, empty"><span class="ct e"><span class="top"><span class="num">17</span></span></span></button><button class="box f role-G" type="button" data-k="10-9" style="grid-row:11;grid-column:10" aria-label="Box 16, Garrison B, Garrison" title="Garrison B"><span class="ct"><span class="top"><span class="num">16</span><span class="rl">G</span></span><span class="nm">Garrison B</span></span></button><button class="box" type="button" data-k="10-10" style="grid-row:11;grid-column:11" aria-label="Box 15, empty"><span class="ct e"><span class="top"><span class="num">15</span></span></span></button><button class="box" type="button" data-k="10-11" style="grid-row:11;grid-column:12" aria-label="Box 46, empty"><span class="ct e"><span class="top"><span class="num">46</span></span></span></button><button class="box" type="button" data-k="10-12" style="grid-row:11;grid-column:13" aria-label="Box 85, empty"><span class="ct e"><span class="top"><span class="num">85</span></span></span></button><button class="box" type="button" data-k="10-13" style="grid-row:11;grid-column:14" aria-label="Box 132, empty"><span class="ct e"><span class="top"><span class="num">132</span></span></span></button><button class="box" type="button" data-k="11-0" style="grid-row:12;grid-column:1" aria-label="Box 150, empty"><span class="ct e"><span class="top"><span class="num">150</span></span></span></button><button class="box" type="button" data-k="11-1" style="grid-row:12;grid-column:2" aria-label="Box 99, empty"><span class="ct e"><span class="top"><span class="num">99</span></span></span></button><button class="box f role-J" type="button" data-k="11-2" style="grid-row:12;grid-column:3" aria-label="Box 56, Joiner E, Joiner" title="Joiner E"><span class="ct"><span class="top"><span class="num">56</span><span class="rl">J</span></span><span class="nm">Joiner E</span></span></button><button class="box" type="button" data-k="11-3" style="grid-row:12;grid-column:4" aria-label="Box 55, empty"><span class="ct e"><span class="top"><span class="num">55</span></span></span></button><button class="box" type="button" data-k="11-4" style="grid-row:12;grid-column:5" aria-label="Box 54, empty"><span class="ct e"><span class="top"><span class="num">54</span></span></span></button><button class="box" type="button" data-k="11-5" style="grid-row:12;grid-column:6" aria-label="Box 53, empty"><span class="ct e"><span class="top"><span class="num">53</span></span></span></button><button class="box" type="button" data-k="11-6" style="grid-row:12;grid-column:7" aria-label="Box 52, empty"><span class="ct e"><span class="top"><span class="num">52</span></span></span></button><button class="box" type="button" data-k="11-7" style="grid-row:12;grid-column:8" aria-label="Box 51, empty"><span class="ct e"><span class="top"><span class="num">51</span></span></span></button><button class="box" type="button" data-k="11-8" style="grid-row:12;grid-column:9" aria-label="Box 50, empty"><span class="ct e"><span class="top"><span class="num">50</span></span></span></button><button class="box" type="button" data-k="11-9" style="grid-row:12;grid-column:10" aria-label="Box 49, empty"><span class="ct e"><span class="top"><span class="num">49</span></span></span></button><button class="box f role-J" type="button" data-k="11-10" style="grid-row:12;grid-column:11" aria-label="Box 48, Joiner D, Joiner" title="Joiner D"><span class="ct"><span class="top"><span class="num">48</span><span class="rl">J</span></span><span class="nm">Joiner D</span></span></button><button class="box" type="button" data-k="11-11" style="grid-row:12;grid-column:12" aria-label="Box 47, empty"><span class="ct e"><span class="top"><span class="num">47</span></span></span></button><button class="box" type="button" data-k="11-12" style="grid-row:12;grid-column:13" aria-label="Box 86, empty"><span class="ct e"><span class="top"><span class="num">86</span></span></span></button><button class="box" type="button" data-k="11-13" style="grid-row:12;grid-column:14" aria-label="Box 133, empty"><span class="ct e"><span class="top"><span class="num">133</span></span></span></button><button class="box" type="button" data-k="12-0" style="grid-row:13;grid-column:1" aria-label="Box 149, empty"><span class="ct e"><span class="top"><span class="num">149</span></span></span></button><button class="box" type="button" data-k="12-1" style="grid-row:13;grid-column:2" aria-label="Box 98, empty"><span class="ct e"><span class="top"><span class="num">98</span></span></span></button><button class="box" type="button" data-k="12-2" style="grid-row:13;grid-column:3" aria-label="Box 97, empty"><span class="ct e"><span class="top"><span class="num">97</span></span></span></button><button class="box" type="button" data-k="12-3" style="grid-row:13;grid-column:4" aria-label="Box 96, empty"><span class="ct e"><span class="top"><span class="num">96</span></span></span></button><button class="box" type="button" data-k="12-4" style="grid-row:13;grid-column:5" aria-label="Box 95, empty"><span class="ct e"><span class="top"><span class="num">95</span></span></span></button><button class="box" type="button" data-k="12-5" style="grid-row:13;grid-column:6" aria-label="Box 94, empty"><span class="ct e"><span class="top"><span class="num">94</span></span></span></button><button class="box" type="button" data-k="12-6" style="grid-row:13;grid-column:7" aria-label="Box 93, empty"><span class="ct e"><span class="top"><span class="num">93</span></span></span></button><button class="box" type="button" data-k="12-7" style="grid-row:13;grid-column:8" aria-label="Box 92, empty"><span class="ct e"><span class="top"><span class="num">92</span></span></span></button><button class="box" type="button" data-k="12-8" style="grid-row:13;grid-column:9" aria-label="Box 91, empty"><span class="ct e"><span class="top"><span class="num">91</span></span></span></button><button class="box" type="button" data-k="12-9" style="grid-row:13;grid-column:10" aria-label="Box 90, empty"><span class="ct e"><span class="top"><span class="num">90</span></span></span></button><button class="box" type="button" data-k="12-10" style="grid-row:13;grid-column:11" aria-label="Box 89, empty"><span class="ct e"><span class="top"><span class="num">89</span></span></span></button><button class="box" type="button" data-k="12-11" style="grid-row:13;grid-column:12" aria-label="Box 88, empty"><span class="ct e"><span class="top"><span class="num">88</span></span></span></button><button class="box" type="button" data-k="12-12" style="grid-row:13;grid-column:13" aria-label="Box 87, empty"><span class="ct e"><span class="top"><span class="num">87</span></span></span></button><button class="box" type="button" data-k="12-13" style="grid-row:13;grid-column:14" aria-label="Box 134, empty"><span class="ct e"><span class="top"><span class="num">134</span></span></span></button><button class="box" type="button" data-k="13-0" style="grid-row:14;grid-column:1" aria-label="Box 148, empty"><span class="ct e"><span class="top"><span class="num">148</span></span></span></button><button class="box" type="button" data-k="13-1" style="grid-row:14;grid-column:2" aria-label="Box 147, empty"><span class="ct e"><span class="top"><span class="num">147</span></span></span></button><button class="box" type="button" data-k="13-2" style="grid-row:14;grid-column:3" aria-label="Box 146, empty"><span class="ct e"><span class="top"><span class="num">146</span></span></span></button><button class="box" type="button" data-k="13-3" style="grid-row:14;grid-column:4" aria-label="Box 145, empty"><span class="ct e"><span class="top"><span class="num">145</span></span></span></button><button class="box" type="button" data-k="13-4" style="grid-row:14;grid-column:5" aria-label="Box 144, empty"><span class="ct e"><span class="top"><span class="num">144</span></span></span></button><button class="box" type="button" data-k="13-5" style="grid-row:14;grid-column:6" aria-label="Box 143, empty"><span class="ct e"><span class="top"><span class="num">143</span></span></span></button><button class="box" type="button" data-k="13-6" style="grid-row:14;grid-column:7" aria-label="Box 142, empty"><span class="ct e"><span class="top"><span class="num">142</span></span></span></button><button class="box" type="button" data-k="13-7" style="grid-row:14;grid-column:8" aria-label="Box 141, empty"><span class="ct e"><span class="top"><span class="num">141</span></span></span></button><button class="box" type="button" data-k="13-8" style="grid-row:14;grid-column:9" aria-label="Box 140, empty"><span class="ct e"><span class="top"><span class="num">140</span></span></span></button><button class="box" type="button" data-k="13-9" style="grid-row:14;grid-column:10" aria-label="Box 139, empty"><span class="ct e"><span class="top"><span class="num">139</span></span></span></button><button class="box" type="button" data-k="13-10" style="grid-row:14;grid-column:11" aria-label="Box 138, empty"><span class="ct e"><span class="top"><span class="num">138</span></span></span></button><button class="box" type="button" data-k="13-11" style="grid-row:14;grid-column:12" aria-label="Box 137, empty"><span class="ct e"><span class="top"><span class="num">137</span></span></span></button><button class="box" type="button" data-k="13-12" style="grid-row:14;grid-column:13" aria-label="Box 136, empty"><span class="ct e"><span class="top"><span class="num">136</span></span></span></button><button class="box" type="button" data-k="13-13" style="grid-row:14;grid-column:14" aria-label="Box 135, empty"><span class="ct e"><span class="top"><span class="num">135</span></span></span></button></div></div></div>
+    </section>
+
+    <aside class="side">
+      <section class="card editor" id="editor" aria-live="polite">
+        <div id="assignPanel">
+          <div class="ed-head"><h2 id="edTitle">Box 8 · OMG</h2><button class="btn" id="edClose" type="button">Close</button></div>
+          <p class="hint" id="edHint" hidden="">Click a box on the map to add a name.</p>
+          <div id="edFields">
+            <label class="l" for="edName">Player name</label>
+            <input class="in" id="edName" type="text" maxlength="32" autocomplete="off" placeholder="Type a name, press Enter for the next box (clockwise)">
+            <label class="l" id="roleLabel">Role</label>
+            <div class="roles" id="edRoles" role="radiogroup" aria-labelledby="roleLabel"><button class="chip role-L" type="button" role="radio" data-r="L" aria-checked="true" aria-pressed="true"><i>L</i>Rally Leader</button><button class="chip role-B" type="button" role="radio" data-r="B" aria-checked="false" aria-pressed="false"><i>B</i>Backup Leader</button><button class="chip role-G" type="button" role="radio" data-r="G" aria-checked="false" aria-pressed="false"><i>G</i>Garrison</button><button class="chip role-T" type="button" role="radio" data-r="T" aria-checked="false" aria-pressed="false"><i>T</i>Turret</button><button class="chip role-J" type="button" role="radio" data-r="J" aria-checked="false" aria-pressed="false"><i>J</i>Joiner</button></div>
+            <label class="l" for="edNote">Note</label>
+            <input class="in" id="edNote" type="text" maxlength="60" autocomplete="off" placeholder="Troops, time zone, anything useful">
+            <div class="actions">
+              <button class="btn" id="edPrev" type="button">Previous box</button>
+              <button class="btn" id="edNext" type="button">Next box</button>
+              <button class="btn danger" id="edClear" type="button">Empty this box</button>
+            </div>
+          </div>
+        </div>
+        <div id="layoutPanel" hidden="">
+          <h2>Edit layout</h2>
+          <p class="hint">Click any box to remove it. Click a dashed outline to add a box back. The castle stays in the middle.</p>
+          <label class="l">Rings of boxes around the castle</label>
+          <div class="roles" id="ringBtns"><button class="chip" type="button" data-ring="1" style="padding:5px 12px">1 ring · 28 boxes</button><button class="chip" type="button" data-ring="2" style="padding:5px 12px">2 rings · 64 boxes</button><button class="chip" type="button" data-ring="3" style="padding:5px 12px">3 rings · 108 boxes</button><button class="chip" type="button" data-ring="4" style="padding:5px 12px">4 rings · 160 boxes</button></div>
+          <div class="actions"><button class="btn" id="dropEmpty" type="button">Remove empty boxes</button></div>
+          <p class="msg" id="layoutMsg"></p>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Summary">
+        <h2>Summary</h2>
+        <div class="stats">
+          <div class="stat"><b id="stBoxes">160</b><span>boxes</span></div>
+          <div class="stat"><b id="stFilled">22</b><span>named</span></div>
+          <div class="stat"><b id="stFree">138</b><span>empty</span></div>
+        </div>
+        <ul class="list" id="leaders"><li><button type="button" class="role-L" data-k="3-3"><span class="dot"></span><span class="t">Tydog</span><span class="m">Rally Leader · box 1</span></button></li><li><button type="button" class="role-L" data-k="3-4"><span class="dot"></span><span class="t">King Solomon</span><span class="m">Rally Leader · box 2</span></button></li><li><button type="button" class="role-L" data-k="3-5"><span class="dot"></span><span class="t">Biggov</span><span class="m">Rally Leader · box 3</span></button></li><li><button type="button" class="role-L" data-k="3-6"><span class="dot"></span><span class="t">Chopper</span><span class="m">Rally Leader · box 4</span></button></li><li><button type="button" class="role-L" data-k="3-7"><span class="dot"></span><span class="t">Wood</span><span class="m">Rally Leader · box 5</span></button></li><li><button type="button" class="role-L" data-k="3-8"><span class="dot"></span><span class="t">Frank</span><span class="m">Rally Leader · box 6</span></button></li><li><button type="button" class="role-L" data-k="3-9"><span class="dot"></span><span class="t">DMT</span><span class="m">Rally Leader · box 7</span></button></li><li><button type="button" class="role-L" data-k="3-10"><span class="dot"></span><span class="t">OMG</span><span class="m">Rally Leader · box 8</span></button></li><li><button type="button" class="role-L" data-k="4-10"><span class="dot"></span><span class="t">PBK</span><span class="m">Rally Leader · box 9</span></button></li><li><button type="button" class="role-L" data-k="5-10"><span class="dot"></span><span class="t">PBK</span><span class="m">Rally Leader · box 10</span></button></li><li><button type="button" class="role-L" data-k="6-10"><span class="dot"></span><span class="t">PBK</span><span class="m">Rally Leader · box 11</span></button></li><li><button type="button" class="role-L" data-k="7-10"><span class="dot"></span><span class="t">Ashurey</span><span class="m">Rally Leader · box 12</span></button></li><li><button type="button" class="role-L" data-k="8-10"><span class="dot"></span><span class="t">PBK</span><span class="m">Rally Leader · box 13</span></button></li><li><button type="button" class="role-L" data-k="9-10"><span class="dot"></span><span class="t">PBK</span><span class="m">Rally Leader · box 14</span></button></li></ul>
+        <p class="warn" id="dupWarn">Placed in more than one box: PBK</p>
+      </section>
+
+      <details class="card">
+        <summary>Add many names</summary>
+        <p class="hint">One name per line. They go into empty boxes, inner ring first, clockwise from the North corner.</p>
+        <textarea class="in" id="bulkTxt" placeholder="Name 1
+Name 2
+Name 3" aria-label="Names, one per line"></textarea>
+        <div class="row">
+          <label for="bulkRole" class="l" style="margin:0">Role</label>
+          <select id="bulkRole"><option value="L">Rally Leader</option><option value="B">Backup Leader</option><option value="G">Garrison</option><option value="T">Turret</option><option value="J" selected="">Joiner</option></select>
+          <button class="btn" id="bulkGo" type="button">Add names</button>
+        </div>
+        <p class="msg" id="bulkMsg"></p>
+      </details>
+
+      <details class="card" id="copyBox" hidden="">
+        <summary>Copy list</summary>
+        <textarea class="in" id="copyFall" readonly="" aria-label="List to copy"></textarea>
+      </details>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  var N = 14, RINGS = 4, GAP = 6, BASE = 2100;
+  var ROLES = [["L", "Rally Leader"], ["B", "Backup Leader"], ["G", "Garrison"], ["T", "Turret"], ["J", "Joiner"]];
+  var RN = {}; ROLES.forEach(function (r) { RN[r[0]] = r[1]; });
+  var $ = function (id) { return document.getElementById(id); };
+  var K = function (r, c) { return r + "-" + c; };
+  /* depth 0 is the outermost ring of the grid. The middle of the grid (depth 4 and up) is the castle. */
+  var depth = function (r, c) { return Math.min(r, c, N - 1 - r, N - 1 - c); };
+  var inGrid = function (r, c) { return depth(r, c) <= RINGS - 1; };
+  var ringNo = function (r, c) { return RINGS - depth(r, c); };   /* 1 = ring touching the castle zone */
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]; }); }
+  function parseK(k) { var p = k.split("-"); return [+p[0], +p[1]]; }
+  /* Position along a ring, clockwise from its top-left corner. */
+  function perim(r, c) {
+    var d = depth(r, c), L = N - 2 * d, y = r - d, x = c - d;
+    if (y === 0) return x;
+    if (x === L - 1) return (L - 1) + y;
+    if (y === L - 1) return 2 * (L - 1) + (L - 1 - x);
+    return 3 * (L - 1) + (L - 1 - y);
+  }
+  function cellsWithin(n) {
+    var out = [];
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (inGrid(r, c) && ringNo(r, c) <= n) out.push(K(r, c));
+    return out;
+  }
+  function order(keys) {
+    return keys.slice().sort(function (a, b) {
+      var p = parseK(a), q = parseK(b);
+      return (ringNo(p[0], p[1]) - ringNo(q[0], q[1])) || (perim(p[0], p[1]) - perim(q[0], q[1]));
+    });
+  }
+
+  function defaultState() {
+    var layout = cellsWithin(RINGS), ord = order(layout), boxes = {};
+    var sample = [[0, "Leader A", "L"], [4, "Leader B", "L"], [8, "Backup A", "B"], [11, "Garrison A", "G"], [15, "Garrison B", "G"], [19, "Turret A", "T"],
+      [29, "Joiner A", "J"], [31, "Joiner B", "J"], [34, "A Very Long Joiner Name", "J"], [40, "Joiner C", "J"], [47, "Joiner D", "J"], [55, "Joiner E", "J"]];
+    sample.forEach(function (s) { boxes[ord[s[0]]] = { n: s[1], r: s[2], t: "" }; });
+    return { v: 4, layout: layout, boxes: boxes, sample: true };
+  }
+  function normalize(d) {
+    if (!d || (d.v !== 2 && d.v !== 3 && d.v !== 4)) return null;
+    var shift = d.v === 2 ? (N - 8) / 2 : d.v === 3 ? (N - 12) / 2 : 0;   /* older, smaller layouts move to the middle of the bigger grid */
+    var ok = /^\d+-\d+$/, s = { v: 4, layout: [], boxes: {}, sample: !!d.sample };
+    function mv(k) { var p = parseK(k); return K(p[0] + shift, p[1] + shift); }
+    function good(m) { var p = parseK(m); return p[0] < N && p[1] < N && inGrid(p[0], p[1]); }
+    if (Array.isArray(d.layout)) d.layout.forEach(function (k) {
+      if (typeof k !== "string" || !ok.test(k)) return;
+      var m = mv(k); if (good(m) && s.layout.indexOf(m) < 0) s.layout.push(m);
+    });
+    if (d.v < 4) s.layout = cellsWithin(RINGS);   /* older saves open with all 4 rings */
+    if (d.boxes && typeof d.boxes === "object") Object.keys(d.boxes).forEach(function (k) {
+      var b = d.boxes[k]; if (!ok.test(k) || !b || typeof b !== "object") return;
+      var m = mv(k); if (!good(m)) return;
+      var rr = b.r === "M" ? "J" : b.r;
+      s.boxes[m] = { n: String(b.n || "").slice(0, 32), r: RN[rr] ? rr : "J", t: String(b.t || "").slice(0, 60) };
+    });
+    return s;
+  }
+  function canon(s) {
+    var o = { v: 4, layout: s.layout.slice().sort(), boxes: {}, sample: !!s.sample };
+    Object.keys(s.boxes).sort().forEach(function (k) { o.boxes[k] = s.boxes[k]; });
+    return JSON.stringify(o);
+  }
+
+  var state = defaultState();
+  var ui = { mode: "assign", sel: null, role: null, q: "" };
+  var db = null, ref = null, lastSaved = "", writing = false, dirty = false, timer = null, readOnly = false, confirmTimer = null;
+
+  function active() { return state.layout; }
+  function box(k) { return state.boxes[k] || (state.boxes[k] = { n: "", r: "J", t: "" }); }
+  function prune(k) { var b = state.boxes[k]; if (b && !b.n && !b.t && b.r === "J") delete state.boxes[k]; }
+
+  /* ---------- status + saving ---------- */
+  var STATUS = { load: "Loading...", saving: "Saving...", saved: "Saved", local: "Saved in this browser only", error: "Could not save. Try again.", ro: "View only", slow: "Saved data not reached yet" };
+  function setStatus(s) { var e = $("status"); e.textContent = STATUS[s]; e.dataset.s = s; }
+  function schedule() {
+    if (readOnly) return;
+    clearTimeout(timer); setStatus("saving"); timer = setTimeout(flush, 500);
+  }
+  function flush() {
+    timer = null;
+    if (writing) { dirty = true; return; }
+    var c = canon(state);
+    if (c === lastSaved) { setStatus(ref ? "saved" : "local"); return; }
+    writing = true;
+    var p;
+    if (ref) p = ref.set(JSON.parse(c));
+    else { try { localStorage.setItem("castle-planner-v2", c); } catch (e) {} p = Promise.resolve(); }
+    p.then(function () { lastSaved = c; setStatus(ref ? "saved" : "local"); })
+     .catch(function (e) {
+       if (e && e.code === "invalid_argument") { readOnly = true; applyReadOnly(); } else setStatus("error");
+     })
+     .then(function () { writing = false; if (dirty) { dirty = false; flush(); } });
+  }
+  function applyReadOnly() {
+    setStatus("ro");
+    ["edName", "edNote", "edClear", "bulkGo", "clearBtn", "dropEmpty", "sampleClear"].forEach(function (id) { var e = $(id); if (e) e.disabled = true; });
+    document.querySelectorAll("#edRoles .chip").forEach(function (b) { b.disabled = true; });
+  }
+  function changed() { persistSoon(); }
+  function persistSoon() { schedule(); }
+
+  /* ---------- rendering ---------- */
+  var castleSvg = '<svg viewBox="0 0 120 98" aria-hidden="true" fill="currentColor"><rect x="6" y="44" width="108" height="54"/><rect x="6" y="24" width="28" height="74"/><rect x="6" y="16" width="6" height="8"/><rect x="17" y="16" width="6" height="8"/><rect x="28" y="16" width="6" height="8"/><rect x="42" y="10" width="36" height="88"/><rect x="42" y="2" width="6" height="8"/><rect x="57" y="2" width="6" height="8"/><rect x="72" y="2" width="6" height="8"/><rect x="86" y="24" width="28" height="74"/><rect x="86" y="16" width="6" height="8"/><rect x="97" y="16" width="6" height="8"/><rect x="108" y="16" width="6" height="8"/><path d="M52 98V74a8 8 0 0 1 16 0V98z" fill="var(--castle-dark)"/></svg>';
+
+  var zoneHTML = '<div class="zone" role="img" aria-label="King\'s Castle with four turrets"><span class="tur tn">Turret N</span><span class="tur te">Turret E</span><span class="tur ts">Turret S</span><span class="tur tw">Turret W</span><div class="keep"><div class="kin">' + castleSvg + '<b>King’s Castle</b></div></div></div>';
+
+  function names() {
+    var count = {};
+    active().forEach(function (k) { var b = state.boxes[k]; if (b && b.n) { var x = b.n.trim().toLowerCase(); count[x] = (count[x] || 0) + 1; } });
+    return count;
+  }
+  function numbering() { var m = {}; order(active()).forEach(function (k, i) { m[k] = i + 1; }); return m; }
+
+  function renderMap() {
+    var num = numbering(), cnt = names(), act = {}, q = ui.q.trim().toLowerCase(), h = "";
+    active().forEach(function (k) { act[k] = 1; });
+    h += zoneHTML;
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+      if (!inGrid(r, c)) continue;
+      var k = K(r, c), pos = 'style="grid-row:' + (r + 1) + ";grid-column:" + (c + 1) + '"';
+      if (!act[k]) {
+        if (ui.mode === "layout") h += '<button class="box off" type="button" data-k="' + k + '" ' + pos + ' aria-label="Add a box here"></button>';
+        continue;
+      }
+      var b = state.boxes[k], filled = !!(b && b.n), cls = "box";
+      if (filled) cls += " f role-" + b.r;
+      if (ui.sel === k && ui.mode === "assign") cls += " sel";
+      if (filled && cnt[b.n.trim().toLowerCase()] > 1) cls += " dup";
+      if (ui.role && !(filled && b.r === ui.role)) cls += " dim";
+      if (q && !(b && (b.n.toLowerCase().indexOf(q) >= 0 || (b.t || "").toLowerCase().indexOf(q) >= 0))) cls += " dim";
+      var label = "Box " + num[k] + (filled ? ", " + b.n + ", " + RN[b.r] : ", empty");
+      h += '<button class="' + cls + '" type="button" data-k="' + k + '" ' + pos + ' aria-label="' + esc(label) + '"' + (filled ? ' title="' + esc(b.n + (b.t ? " - " + b.t : "")) + '"' : "") + ">" +
+        '<span class="ct' + (filled ? "" : " e") + '"><span class="top"><span class="num">' + num[k] + "</span>" + (filled ? '<span class="rl">' + b.r + "</span>" : "") + "</span>" +
+        (filled ? '<span class="nm">' + esc(b.n) + "</span>" : "") + "</span></button>";
+    }
+    $("grid").innerHTML = h;
+  }
+
+  function renderLegend() {
+    $("legend").innerHTML = ROLES.map(function (r) {
+      return '<button class="chip role-' + r[0] + '" type="button" data-role="' + r[0] + '" aria-pressed="' + (ui.role === r[0]) + '"><i>' + r[0] + "</i>" + r[1] + "</button>";
+    }).join("");
+  }
+
+  function renderSummary() {
+    var total = active().length, filled = 0, cnt = names();
+    active().forEach(function (k) { var b = state.boxes[k]; if (b && b.n) filled++; });
+    $("stBoxes").textContent = total; $("stFilled").textContent = filled; $("stFree").textContent = total - filled;
+    var num = numbering(), rows = [];
+    order(active()).forEach(function (k) { var b = state.boxes[k]; if (b && b.n && (b.r === "L" || b.r === "B")) rows.push([k, b]); });
+    rows.sort(function (x, y) { return (x[1].r === "L" ? 0 : 1) - (y[1].r === "L" ? 0 : 1); });
+    $("leaders").innerHTML = rows.length ? rows.map(function (x) {
+      return '<li><button type="button" class="role-' + x[1].r + '" data-k="' + x[0] + '"><span class="dot"></span><span class="t">' + esc(x[1].n) + '</span><span class="m">' + RN[x[1].r] + " · box " + num[x[0]] + "</span></button></li>";
+    }).join("") : '<li class="hint">No rally leaders yet. Pick the Rally Leader role on a box.</li>';
+    var dups = Object.keys(cnt).filter(function (x) { return cnt[x] > 1; });
+    var w = $("dupWarn");
+    if (dups.length) {
+      var shown = {};
+      active().forEach(function (k) { var b = state.boxes[k]; if (b && b.n && cnt[b.n.trim().toLowerCase()] > 1) shown[b.n.trim()] = 1; });
+      w.hidden = false; w.textContent = "Placed in more than one box: " + Object.keys(shown).join(", ");
+    } else w.hidden = true;
+    $("banner").hidden = !state.sample;
+  }
+
+  function renderRoles() {
+    $("edRoles").innerHTML = ROLES.map(function (r) {
+      return '<button class="chip role-' + r[0] + '" type="button" role="radio" data-r="' + r[0] + '" aria-checked="false"><i>' + r[0] + "</i>" + r[1] + "</button>";
+    }).join("");
+    $("bulkRole").innerHTML = ROLES.map(function (r) { return '<option value="' + r[0] + '"' + (r[0] === "J" ? " selected" : "") + ">" + r[1] + "</option>"; }).join("");
+    $("ringBtns").innerHTML = [[1, "1 ring \u00b7 28 boxes"], [2, "2 rings \u00b7 64 boxes"], [3, "3 rings \u00b7 108 boxes"], [4, "4 rings \u00b7 160 boxes"]].map(function (x) {
+      return '<button class="chip" type="button" data-ring="' + x[0] + '" style="padding:5px 12px">' + x[1] + "</button>";
+    }).join("");
+  }
+
+  function fillEditor() {
+    var k = ui.sel, ed = $("editor");
+    var assign = ui.mode === "assign";
+    $("assignPanel").hidden = !assign; $("layoutPanel").hidden = assign;
+    ed.classList.toggle("empty", assign && !k);
+    document.body.classList.toggle("editing", !assign || !!k);
+    if (!assign) return;
+    $("edFields").hidden = !k; $("edHint").hidden = !!k;
+    $("edClose").hidden = !k;
+    if (!k) { $("edTitle").textContent = "Box"; return; }
+    var b = state.boxes[k] || { n: "", r: "J", t: "" }, num = numbering();
+    $("edTitle").textContent = "Box " + num[k] + (b.n ? " · " + b.n : "");
+    if (document.activeElement !== $("edName")) $("edName").value = b.n;
+    if (document.activeElement !== $("edNote")) $("edNote").value = b.t || "";
+    document.querySelectorAll("#edRoles .chip").forEach(function (c) { c.setAttribute("aria-checked", String(c.dataset.r === b.r)); c.setAttribute("aria-pressed", String(c.dataset.r === b.r)); });
+  }
+
+  function renderAll() { renderMap(); renderSummary(); renderLegend(); fillEditor(); }
+
+  /* ---------- selection ---------- */
+  function select(k, focus) {
+    ui.sel = k; renderMap(); fillEditor(); if (k) reveal(k);
+    if (k && focus) { var e = $("edName"); e.focus(); e.select(); }
+  }
+  function step(d) {
+    var ord = order(active()); if (!ord.length) return;
+    var i = ord.indexOf(ui.sel); i = i < 0 ? 0 : (i + d + ord.length) % ord.length;
+    select(ord[i], true);
+  }
+
+  /* ---------- events ---------- */
+  $("grid").addEventListener("click", function (e) {
+    var b = e.target.closest(".box"); if (!b) return;
+    if (moved) return;
+    var k = b.dataset.k;
+    if (ui.mode === "assign") { select(k, true); return; }
+    if (readOnly) return;
+    var i = state.layout.indexOf(k);
+    if (i >= 0) state.layout.splice(i, 1); else state.layout.push(k);
+    if (ui.sel === k) ui.sel = null;
+    renderMap(); renderSummary(); changed();
+  });
+  $("leaders").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-k]"); if (!b) return;
+    setMode("assign"); select(b.dataset.k, true);
+  });
+  $("legend").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-role]"); if (!b) return;
+    ui.role = ui.role === b.dataset.role ? null : b.dataset.role; renderLegend(); renderMap();
+  });
+  $("search").addEventListener("input", function () { ui.q = this.value; renderMap(); });
+
+  function setMode(m) {
+    ui.mode = m;
+    $("modeAssign").setAttribute("aria-pressed", String(m === "assign"));
+    $("modeLayout").setAttribute("aria-pressed", String(m === "layout"));
+    renderMap(); fillEditor();
+  }
+  $("modeAssign").addEventListener("click", function () { setMode("assign"); });
+  $("modeLayout").addEventListener("click", function () { setMode("layout"); });
+
+  $("edName").addEventListener("input", function () {
+    if (!ui.sel || readOnly) return;
+    var b = box(ui.sel); b.n = this.value.slice(0, 32); prune(ui.sel);
+    renderMap(); renderSummary(); fillEditor(); changed();
+  });
+  $("edName").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+    if (e.key === "Escape") select(null, false);
+  });
+  $("edNote").addEventListener("input", function () {
+    if (!ui.sel || readOnly) return;
+    var b = box(ui.sel); b.t = this.value.slice(0, 60); prune(ui.sel);
+    renderMap(); changed();
+  });
+  $("edNote").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); step(1); }
+    if (e.key === "Escape") select(null, false);
+  });
+  $("edRoles").addEventListener("click", function (e) {
+    var c = e.target.closest(".chip"); if (!c || !ui.sel || readOnly) return;
+    box(ui.sel).r = c.dataset.r; prune(ui.sel);
+    renderMap(); renderSummary(); fillEditor(); changed();
+  });
+  $("edPrev").addEventListener("click", function () { step(-1); });
+  $("edNext").addEventListener("click", function () { step(1); });
+  $("edClose").addEventListener("click", function () { select(null, false); });
+  $("edClear").addEventListener("click", function () {
+    if (!ui.sel || readOnly) return;
+    delete state.boxes[ui.sel]; $("edName").value = ""; $("edNote").value = "";
+    renderMap(); renderSummary(); fillEditor(); changed();
+    $("edName").focus();
+  });
+
+  $("ringBtns").addEventListener("click", function (e) {
+    var c = e.target.closest("[data-ring]"); if (!c || readOnly) return;
+    var n = +c.dataset.ring; state.layout = cellsWithin(n); ui.sel = null;
+    $("layoutMsg").textContent = "Showing " + n + " ring" + (n > 1 ? "s" : "") + " (" + state.layout.length + " boxes). Names in hidden boxes are kept.";
+    renderMap(); renderSummary(); changed();
+  });
+  $("dropEmpty").addEventListener("click", function () {
+    if (readOnly) return;
+    var before = state.layout.length;
+    state.layout = state.layout.filter(function (k) { return state.boxes[k] && state.boxes[k].n; });
+    $("layoutMsg").textContent = "Removed " + (before - state.layout.length) + " empty boxes.";
+    ui.sel = null; renderMap(); renderSummary(); changed();
+  });
+
+  $("bulkGo").addEventListener("click", function () {
+    if (readOnly) return;
+    var lines = $("bulkTxt").value.split(/\r?\n/).map(function (s) { return s.trim().slice(0, 32); }).filter(Boolean);
+    if (!lines.length) { $("bulkMsg").textContent = "Type or paste at least one name."; return; }
+    var role = $("bulkRole").value, free = order(active()).filter(function (k) { return !(state.boxes[k] && state.boxes[k].n); });
+    var n = Math.min(lines.length, free.length);
+    for (var i = 0; i < n; i++) { var b = box(free[i]); b.n = lines[i]; b.r = role; }
+    $("bulkMsg").textContent = "Added " + n + " name" + (n === 1 ? "" : "s") + "." + (lines.length > n ? " " + (lines.length - n) + " did not fit. Add boxes in Edit layout." : "");
+    if (n) $("bulkTxt").value = lines.slice(n).join("\n");
+    renderMap(); renderSummary(); fillEditor(); changed();
+  });
+
+  function listText() {
+    var num = numbering(), out = [];
+    order(active()).forEach(function (k) {
+      var b = state.boxes[k]; if (b && b.n) out.push(num[k] + ". " + b.n + " - " + RN[b.r] + (b.t ? " (" + b.t + ")" : ""));
+    });
+    return out.join("\n");
+  }
+  $("copyBtn").addEventListener("click", function () {
+    var t = listText(), btn = this;
+    if (!t) { btn.textContent = "Nothing to copy yet"; setTimeout(function () { btn.textContent = "Copy list"; }, 1800); return; }
+    function fallback() {
+      $("copyBox").hidden = false; $("copyBox").open = true;
+      var ta = $("copyFall"); ta.value = t; ta.focus(); ta.select();
+      btn.textContent = "Select and copy below"; setTimeout(function () { btn.textContent = "Copy list"; }, 2500);
+    }
+    try {
+      navigator.clipboard.writeText(t).then(function () {
+        btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy list"; }, 1800);
+      }, fallback);
+    } catch (e) { fallback(); }
+  });
+  $("clearBtn").addEventListener("click", function () {
+    var btn = this;
+    if (btn.dataset.armed !== "1") {
+      btn.dataset.armed = "1"; btn.textContent = "Click again to confirm";
+      confirmTimer = setTimeout(function () { btn.dataset.armed = ""; btn.textContent = "Clear all names"; }, 3000);
+      return;
+    }
+    clearTimeout(confirmTimer); btn.dataset.armed = ""; btn.textContent = "Clear all names";
+    if (readOnly) return;
+    state.boxes = {}; state.sample = false; ui.sel = null;
+    renderAll(); changed();
+  });
+  $("sampleClear").addEventListener("click", function () {
+    if (readOnly) return;
+    state.boxes = {}; state.sample = false; ui.sel = null; renderAll(); changed();
+  });
+  $("sampleKeep").addEventListener("click", function () {
+    if (readOnly) return;
+    state.sample = false; renderSummary(); changed();
+  });
+
+  /* ---------- zoom, pan, keep the selected box in view ---------- */
+  var wrap = document.querySelector(".mapwrap"), stage = document.querySelector(".stage"), moved = false, drag = null;
+  function applyZoom(z, first) {
+    z = Math.max(30, Math.min(200, Math.round(z) || 120));
+    var fx = 0.5, fy = 0.5;
+    if (!first) {
+      if (wrap.scrollWidth > 0) fx = (wrap.scrollLeft + wrap.clientWidth / 2) / wrap.scrollWidth;
+      if (wrap.scrollHeight > 0) fy = (wrap.scrollTop + wrap.clientHeight / 2) / wrap.scrollHeight;
+    }
+    var W = BASE * z / 100, cell = (W * 0.7071 - (N - 1) * GAP) / N;
+    stage.style.width = W + "px"; stage.style.setProperty("--cell", cell + "px");
+    $("zoom").value = z; $("zVal").textContent = z + "%";
+    wrap.scrollLeft = fx * wrap.scrollWidth - wrap.clientWidth / 2;
+    wrap.scrollTop = fy * wrap.scrollHeight - wrap.clientHeight / 2;
+    try { localStorage.setItem("castle-planner-zoom", String(z)); } catch (e) {}
+  }
+  function curZoom() { return +$("zoom").value || 120; }
+  $("zoom").addEventListener("input", function () { applyZoom(+this.value); });
+  $("zIn").addEventListener("click", function () { applyZoom(curZoom() + 10); });
+  $("zOut").addEventListener("click", function () { applyZoom(curZoom() - 10); });
+  $("zFit").addEventListener("click", function () {
+    var px = Math.min(wrap.clientWidth - 26, window.innerHeight * 0.86 - 26);
+    applyZoom(px / BASE * 100);
+  });
+  wrap.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0 || e.pointerType === "touch") return;
+    drag = { x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop }; moved = false;
+  });
+  wrap.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!moved && Math.abs(dx) + Math.abs(dy) > 6) { moved = true; wrap.classList.add("panning"); }
+    if (moved) { wrap.scrollLeft = drag.sl - dx; wrap.scrollTop = drag.st - dy; }
+  });
+  function endDrag() { drag = null; wrap.classList.remove("panning"); setTimeout(function () { moved = false; }, 0); }
+  wrap.addEventListener("pointerup", endDrag);
+  wrap.addEventListener("pointercancel", endDrag);
+  wrap.addEventListener("pointerleave", function () { if (drag) endDrag(); });
+  function reveal(k) {
+    var el = $("grid").querySelector('.box[data-k="' + k + '"]'); if (!el) return;
+    var er = el.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), pad = 24;
+    if (er.left < wr.left + pad) wrap.scrollLeft -= wr.left + pad - er.left;
+    else if (er.right > wr.right - pad) wrap.scrollLeft += er.right - (wr.right - pad);
+    if (er.top < wr.top + pad) wrap.scrollTop -= wr.top + pad - er.top;
+    else if (er.bottom > wr.bottom - pad) wrap.scrollTop += er.bottom - (wr.bottom - pad);
+  }
+
+  /* ---------- start ---------- */
+  renderRoles();
+  renderAll();
+  setStatus("load");
+
+  function boot() {
+    var c = window.claude;
+    if (!c || !c.use) { fromLocal(); return; }
+    var loadTimer = setTimeout(function () { setStatus("slow"); }, 10000);
+    Promise.all([c.use("db"), c.use("user")]).then(function (res) {
+      db = res[0];
+      if (!db) { clearTimeout(loadTimer); fromLocal(); return; }
+      ref = db.doc("plan/main");
+      if (res[1] && res[1].can) res[1].can("data.write").then(function (ok) { if (ok === false) { readOnly = true; applyReadOnly(); } }, function () {});
+      ref.onSnapshot(function (snap) {
+        clearTimeout(loadTimer);
+        if (!snap.metadata.fromCache && !readOnly && !writing && !timer) setStatus("saved");
+        if (!snap.exists || snap.metadata.hasPendingWrites) { if (!snap.exists && !snap.metadata.fromCache) { lastSaved = ""; if (!readOnly) setStatus("saved"); } return; }
+        var incoming = normalize(snap.data());
+        if (!incoming) return;
+        var c2 = canon(incoming);
+        if (c2 === lastSaved || c2 === canon(state)) { lastSaved = c2; return; }
+        state = incoming; lastSaved = c2;
+        if (ui.sel && state.layout.indexOf(ui.sel) < 0) ui.sel = null;
+        renderAll();
+      }, function (err) {
+        clearTimeout(loadTimer);
+        if (err && err.code === "revoked") { readOnly = true; applyReadOnly(); } else setStatus("error");
+      });
+    }, function () { clearTimeout(loadTimer); fromLocal(); });
+  }
+  function fromLocal() {
+    try {
+      var raw = localStorage.getItem("castle-planner-v2");
+      var nl = raw ? normalize(JSON.parse(raw)) : null;
+      if (nl) { state = nl; lastSaved = canon(state); renderAll(); }
+    } catch (e) {}
+    setStatus("local");
+  }
+  var z0 = 75; try { z0 = +localStorage.getItem("castle-planner-zoom") || 75; } catch (e) {}
+  applyZoom(z0, true);
+  boot();
+})();
+</script>
+
+</body></html>
